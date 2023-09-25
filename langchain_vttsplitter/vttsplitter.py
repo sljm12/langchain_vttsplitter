@@ -3,7 +3,7 @@ vttsplitter contains methods for splitting VTT files
 '''
 
 import re
-from typing import List, Iterable
+from typing import List, Iterable, Dict
 import copy
 from langchain.docstore.document import Document
 from langchain.document_loaders.base import BaseLoader
