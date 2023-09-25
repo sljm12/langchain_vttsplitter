@@ -12,6 +12,9 @@ import requests
 import yt_dlp
 
 def downSub(video_url,language):
+    '''
+    Download subtitle given the youtube url and the language
+    '''
     # check if valid youtube_link and remove playlist ID from url if exists.
     _temp = video_url.lower()
     if 'youtube.com' in _temp or 'youtu.be' in _temp:
@@ -73,36 +76,36 @@ def clear_lines(text):
     prev_timing = ""
     prev_text = ""
     lines = text.split("\n")
-    prev = ""
+    #prev = ""
     metadata = {}
     metasection = True
     timings = []
     transcripts = []
 
-    for l in lines:
+    for current_line in lines:
         # Removes all the um, uhs etc from the text
-        for x in ["um", "uh"]:
-            l = l.replace(x, "")
+        for sound in ["um", "uh"]:
+            current_line = current_line.replace(sound, "")
 
-        if l == "WEBVTT":
+        if current_line == "WEBVTT":
             pass
-        elif "<c>" in l:  # This is one of the duplicate lines
+        elif "<c>" in current_line:  # This is one of the duplicate lines
             pass
-        elif "-->" in l:  # Save the timing info to see
+        elif "-->" in current_line:  # Save the timing info to see
             metasection = False
-            prev_timing = l
-        elif len(l.strip()) == 0:
+            prev_timing = current_line
+        elif len(current_line.strip()) == 0:
             pass
         elif metasection:
-            meta = l.split(":")
+            meta = current_line.split(":")
             metadata[meta[0].strip()] = meta[1].strip()
         else:
-            if l.strip() != prev_text:
-                prev_text = l.strip()
+            if current_line.strip() != prev_text:
+                prev_text = current_line.strip()
                 data = data + prev_timing + "\n"
                 timings.append(prev_timing)
-                data = data + l + "\n"
-                transcripts.append(l)
+                data = data + current_line + "\n"
+                transcripts.append(current_line)
     return data, metadata, timings, transcripts
 
 
@@ -121,12 +124,12 @@ def extract_min_max_time(text):
     first = ""
     last = ""
     lines = text.split("\n")
-    for t in lines:
-        if len(first) == 0 and "->" in t:
-            first = t
+    for current_line in lines:
+        if len(first) == 0 and "->" in current_line:
+            first = current_line
 
-        if "->" in t:
-            last = t
+        if "->" in current_line:
+            last = current_line
     return get_time(first)[0], get_time(last)[1]
 
 
@@ -150,8 +153,8 @@ class YoutubeSubtitleLoader(BaseLoader):
 
     def load(self) -> List[Document]:
         sub_url, title = downSub(self.url, self.language)
-        r = requests.get(sub_url, timeout=30)
-        page_content, vtt_meta, timings, transcript = clear_lines(r.text)
+        result = requests.get(sub_url, timeout=30)
+        page_content, vtt_meta, timings, transcript = clear_lines(result.text)
 
         metadata = {}
         metadata["url"] = self.url
