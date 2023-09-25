@@ -1,32 +1,15 @@
-import yt_dlp
+'''
+vttsplitter contains methods for splitting VTT files
+'''
+
 import re
-import os
-import argparse
+from typing import List, Iterable
+import copy
 from langchain.docstore.document import Document
 from langchain.document_loaders.base import BaseLoader
-from typing import List, Optional
-import requests
-from langchain.text_splitter import TextSplitter
-import copy
-from typing import (
-    AbstractSet,
-    Any,
-    Callable,
-    Collection,
-    Dict,
-    Iterable,
-    List,
-    Literal,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-    TypedDict,
-    TypeVar,
-    Union,
-    cast,
-)
 
+import requests
+import yt_dlp
 
 def downSub(video_url,language):
     # check if valid youtube_link and remove playlist ID from url if exists.
@@ -76,166 +59,200 @@ def downSub(video_url,language):
                 if fmt['ext']=='vtt':
                     sub_dlink = fmt['url']
                     return [sub_dlink,video_name]
-                
 
 def clear_lines(text):
-  data = ""
-  prev_timing = ""
-  prev_text = ""
-  lines = text.split("\n")
-  prev=""
-  metadata={}
-  metasection=True
-  timings=[]
-  transcripts=[]
+    """
+    Process the VTT text
+    data : The VTT Clean text
+    metadata : Metadata in the VTT
+    timings : The Timings information in an array
+    transcripts : The Transcript portion in an array
 
-  for l in lines:
-    # Removes all the um, uhs etc from the text
-    for x in ['um','uh']:
-      l=l.replace(x,"")
+    """
+    data = ""
+    prev_timing = ""
+    prev_text = ""
+    lines = text.split("\n")
+    prev = ""
+    metadata = {}
+    metasection = True
+    timings = []
+    transcripts = []
 
-    if l=="WEBVTT":
-        pass
-    elif "<c>" in l: #This is one of the duplicate lines
-        pass
-    elif "-->" in l: #Save the timing info to see
-        metasection=False
-        prev_timing=l
-    elif len(l.strip()) == 0:
-        pass
-    elif metasection:
-        meta=l.split(":")
-        metadata[meta[0].strip()]=meta[1].strip()
-    else:
-        if l.strip() != prev_text:
-            prev_text=l.strip()
-            data = data + prev_timing +"\n"
-            timings.append(prev_timing)
-            data = data + l+"\n"
-            transcripts.append(l)
-  return data,metadata,timings,transcripts
+    for l in lines:
+        # Removes all the um, uhs etc from the text
+        for x in ["um", "uh"]:
+            l = l.replace(x, "")
+
+        if l == "WEBVTT":
+            pass
+        elif "<c>" in l:  # This is one of the duplicate lines
+            pass
+        elif "-->" in l:  # Save the timing info to see
+            metasection = False
+            prev_timing = l
+        elif len(l.strip()) == 0:
+            pass
+        elif metasection:
+            meta = l.split(":")
+            metadata[meta[0].strip()] = meta[1].strip()
+        else:
+            if l.strip() != prev_text:
+                prev_text = l.strip()
+                data = data + prev_timing + "\n"
+                timings.append(prev_timing)
+                data = data + l + "\n"
+                transcripts.append(l)
+    return data, metadata, timings, transcripts
+
 
 def get_time(text):
-  segments = text.split(" --> ")
-  return (segments[0], segments[1].split(" align:")[0])
+    """
+    Gets the start time and end time from a time segment
+    """
+    segments = text.split(" --> ")
+    return (segments[0], segments[1].split(" align:")[0])
+
 
 def extract_min_max_time(text):
-  first=""
-  last=""
-  lines = text.split("\n")
-  for t in lines:
-    if len(first) == 0 and "->" in t:
-      first = t
+    """
+    Extract the min max time from a segment of VTT text
+    """
+    first = ""
+    last = ""
+    lines = text.split("\n")
+    for t in lines:
+        if len(first) == 0 and "->" in t:
+            first = t
 
-    if "->" in t:
-      last = t
-  return get_time(first)[0],get_time(last)[1]
+        if "->" in t:
+            last = t
+    return get_time(first)[0], get_time(last)[1]
+
 
 def convert_text_time_to_seconds(text):
-  segments = [float(i) for i in text.split(":")]
-  return segments[0]*60*60+segments[1]*60+segments[2]
+    """
+    Converts the VTT formatted time to seconds for use in the YT embed player
+    """
+    segments = [float(i) for i in text.split(":")]
+    return segments[0] * 60 * 60 + segments[1] * 60 + segments[2]
+
 
 class YoutubeSubtitleLoader(BaseLoader):
-  def __init__(self, youtube_url:str, language='en'):
-    self.url = youtube_url
-  def load(self)->List[Document]:
-    sub_url,title=downSub(self.url,'en')
-    r=requests.get(sub_url)
-    page_content,vtt_meta,timings,transcript=clear_lines(r.text)
-    metadata={}
-    metadata['url']=self.url
-    metadata['title']=title
-    metadata.update(vtt_meta)
-    return [Document(page_content=page_content,metadata=metadata)]
-  
-class VTTSplitter(TextSplitter):
-  def __init__(self, chunk:int=512):
-    self.chunk=chunk
+    """
+    This loades the Youtube subtitles in VTT format given the language and the url of the youtube
+    video
+    """
 
-  def process_chunk_doc(self, chunk:str, timings,parent_metadata:Dict)->Document:
-    _, end=extract_min_max_time(timings[-1])
-    start,_ = extract_min_max_time(timings[0])
-    metadata = copy.deepcopy(parent_metadata)
-    metadata["start_time"] = int(convert_text_time_to_seconds(start))
-    metadata["end_time"] = int(convert_text_time_to_seconds(end))
-    return Document(page_content=chunk, metadata=metadata)
+    def __init__(self, youtube_url: str, language="en"):
+        self.url = youtube_url
+        self.language = language
 
-  def split_text_docs(self, doc:Document) -> List[Document]:
-    '''
-    Spilts the Document into smaller Document chunks
-    '''
-    page_content,vtt_meta,timings,transcript=clear_lines(doc.page_content)
-    #stores the consolidated captions
-    temp = ""
-    #Stores the current length of the chunks so that we dont exceed the chunk size
-    current_length = 0
-    #Stores the processed Documents
-    documents= []
-    # stores the timings associated with the captions
-    timings_arr = []
+    def load(self) -> List[Document]:
+        sub_url, title = downSub(self.url, self.language)
+        r = requests.get(sub_url, timeout=30)
+        page_content, vtt_meta, timings, transcript = clear_lines(r.text)
 
-    for i, t in enumerate(transcript):
-      # t is the current text in the transcript
-      length = len(t+"\n")
+        metadata = {}
+        metadata["url"] = self.url
+        metadata["title"] = title
+        metadata.update(vtt_meta)
 
-      #Still processing a chunk
-      if current_length+length <= self.chunk:
+        return [Document(page_content=page_content, metadata=metadata)]
+
+class VTTSplitter:
+    """
+    VTTSplitter splits the VTT text into chunks, it removes the timing information from
+    the text and stores the start and end time in the metadata.
+    """
+
+    def __init__(self, chunk: int = 512):
+        self.chunk = chunk
+
+    def process_chunk_doc(self, chunk: str, timings, parent_metadata: Dict) -> Document:
+        _, end = extract_min_max_time(timings[-1])
+        start, _ = extract_min_max_time(timings[0])
+        metadata = copy.deepcopy(parent_metadata)
+        metadata["start_time"] = int(convert_text_time_to_seconds(start))
+        metadata["end_time"] = int(convert_text_time_to_seconds(end))
+        return Document(page_content=chunk, metadata=metadata)
+
+    def split_text_docs(self, doc: Document) -> List[Document]:
+        """
+        Spilts the Document into smaller Document chunks
+        """
+        page_content, vtt_meta, timings, transcript = clear_lines(doc.page_content)
+        # stores the consolidated captions
+        temp = ""
+        # Stores the current length of the chunks so that we dont exceed the chunk size
+        current_length = 0
+        # Stores the processed Documents
+        documents = []
+        # stores the timings associated with the captions
+        timings_arr = []
+
+        for i, t in enumerate(transcript):
+            # t is the current text in the transcript
+            length = len(t + "\n")
+
+            # Still processing a chunk
+            if current_length + length <= self.chunk:
+                timings_arr.append(timings)
+
+                temp = temp + t + "\n"
+
+                current_length = current_length + length
+            else:
+                # The Chunk is compeleted
+                timings_arr.append(timings)
+                documents.append(self.process_chunk_doc(temp, timings, doc.metadata))
+
+                # start a new chunk
+                temp = ""
+                timings_arr = []
+
+                temp = temp + t + "\n"
+                current_length = length
+
+        # Process the last
         timings_arr.append(timings)
+        documents.append(self.process_chunk_doc(temp, timings, doc.metadata))
+        return documents
 
-        temp=temp+t+"\n"
-
-        current_length=current_length+length
-      else:
-        #The Chunk is compeleted
-        timings_arr.append(timings)
-        documents.append(self.process_chunk_doc(temp,timings,doc.metadata))
-
-        #start a new chunk
-        temp=""
-        timings_arr=[]
-
-        temp=temp+t+"\n"
-        current_length=length
-
-    #Process the last 
-    timings_arr.append(timings)
-    documents.append(self.process_chunk_doc(temp,timings,doc.metadata))
-    return documents
-
-  def split_text(self, text: str) -> List[str]:
-    """Split text into multiple components."""
-    page_content,vtt_meta,timings,transcript=clear_lines(text)
-    temp = ""
-    current_length = 0
-    chunks = []
-    for i, t in enumerate(transcript):
-      length = len(t)
-      if current_length+length <= self.chunk:
-        temp=temp+timings[i]+"\n"
-        temp=temp+t+"\n"
-        #print(temp)
-        current_length=current_length+length
-      else:
+    def split_text(self, text: str) -> List[str]:
+        """Split text into multiple components."""
+        page_content, vtt_meta, timings, transcript = clear_lines(text)
+        temp = ""
+        current_length = 0
+        chunks = []
+        for i, t in enumerate(transcript):
+            length = len(t)
+            if current_length + length <= self.chunk:
+                temp = temp + timings[i] + "\n"
+                temp = temp + t + "\n"
+                # print(temp)
+                current_length = current_length + length
+            else:
+                chunks.append(temp)
+                temp = ""
+                temp = temp + timings[i] + "\n"
+                temp = temp + t + "\n"
+                current_length = len(t)
         chunks.append(temp)
-        temp=""
-        temp=temp+timings[i]+"\n"
-        temp=temp+t+"\n"
-        current_length=len(t)
-    chunks.append(temp)
-    return chunks
+        return chunks
 
-  def split_documents(self, documents: Iterable[Document]) -> List[Document]:
-    docs = []
-    for d in documents:
-      chuncks = self.split_text(d.page_content)
-      metadata=d.metadata
-      for c in chuncks:
-        page_content,vtt_meta,timings,transcript=clear_lines(c)
-        '\n'.join(transcript)
-        start,end=extract_min_max_time(c)
-        current_md = copy.deepcopy(d.metadata)
-        current_md["start_time"] = int(convert_text_time_to_seconds(start))
-        current_md["end_time"] = int(convert_text_time_to_seconds(end))
-        docs.append(Document(page_content='\n'.join(transcript),
-                             metadata=current_md))
-    return docs
+    def split_documents(self, documents: Iterable[Document]) -> List[Document]:
+        docs = []
+        for d in documents:
+            chuncks = self.split_text(d.page_content)
+            for c in chuncks:
+                page_content, vtt_meta, timings, transcript = clear_lines(c)
+
+                start, end = extract_min_max_time(c)
+                current_md = copy.deepcopy(d.metadata)
+                current_md["start_time"] = int(convert_text_time_to_seconds(start))
+                current_md["end_time"] = int(convert_text_time_to_seconds(end))
+                docs.append(
+                    Document(page_content="\n".join(transcript), metadata=current_md)
+                )
+        return docs
