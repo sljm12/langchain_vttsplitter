@@ -207,7 +207,7 @@ class VTTSplitter:
                 current_length = current_length + length
             else:
                 # The Chunk is compeleted
-                timings_arr.append(timings)
+                timings_arr.append(timings[i])
                 documents.append(self.process_chunk_doc(temp, timings_arr, doc.metadata))
 
                 # start a new chunk
