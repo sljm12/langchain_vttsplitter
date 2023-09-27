@@ -193,14 +193,14 @@ class VTTSplitter:
         documents = []
         # stores the timings associated with the captions
         timings_arr = []
-
+        i=0
         for i, t in enumerate(transcript):
             # t is the current text in the transcript
             length = len(t + "\n")
 
             # Still processing a chunk
             if current_length + length <= self.chunk:
-                timings_arr.append(timings)
+                timings_arr.append(timings[i])
 
                 temp = temp + t + "\n"
 
@@ -208,7 +208,7 @@ class VTTSplitter:
             else:
                 # The Chunk is compeleted
                 timings_arr.append(timings)
-                documents.append(self.process_chunk_doc(temp, timings, doc.metadata))
+                documents.append(self.process_chunk_doc(temp, timings_arr, doc.metadata))
 
                 # start a new chunk
                 temp = ""
@@ -218,8 +218,8 @@ class VTTSplitter:
                 current_length = length
 
         # Process the last
-        timings_arr.append(timings)
-        documents.append(self.process_chunk_doc(temp, timings, doc.metadata))
+        timings_arr.append(timings[i])
+        documents.append(self.process_chunk_doc(temp, timings_arr, doc.metadata))
         return documents
 
     def split_text(self, text: str) -> List[str]:
