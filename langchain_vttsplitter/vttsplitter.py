@@ -32,10 +32,9 @@ def downSub(video_url,language):
             #print(info_dict)
             if not info_dict['formats']:
                 print(text=' Status : Something went wrong retry or video is unavailable')
-                return
-    except:
-        print('Error : Check your Internet Connection or Url.')
-        return
+                raise ValueError('Status : Something went wrong retry or video is unavailable')
+    except Exception as exc:
+        raise ValueError("Check your url, video might not have subtitle") from exc
 
 
     video_title = info_dict['title']
