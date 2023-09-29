@@ -11,9 +11,13 @@ from langchain.document_loaders.base import BaseLoader
 import requests
 import yt_dlp
 
-def downSub(video_url,language):
+def download_subtitles(video_url,language):
     '''
-    Download subtitle given the youtube url and the language
+    Download subtitle given the youtube url and the language.
+
+    Throws ValueError if there is an error in retriving based on the URL
+    
+    else returns a tuple of [video_subtitle_url, video_title]
     '''
     # check if valid youtube_link and remove playlist ID from url if exists.
     _temp = video_url.lower()
@@ -61,6 +65,8 @@ def downSub(video_url,language):
                 if fmt['ext']=='vtt':
                     sub_dlink = fmt['url']
                     return [sub_dlink,video_name]
+    
+    return [None, video_title]
 
 def clear_lines(text):
     """
@@ -151,7 +157,7 @@ class YoutubeSubtitleLoader(BaseLoader):
         self.language = language
 
     def load(self) -> List[Document]:
-        sub_url, title = downSub(self.url, self.language)
+        sub_url, title = download_subtitles(self.url, self.language)
         result = requests.get(sub_url, timeout=30)
         page_content, vtt_meta, timings, transcript = clear_lines(result.text)
 
