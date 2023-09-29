@@ -43,3 +43,16 @@ Something else
     start, end = extract_min_max_time(text)
     assert start == "00:02:49.729"
     assert end == "00:02:56.739"
+
+def test_extract_min_max_time_not_vtt():
+    '''
+    Test extraction with rubbish text
+    '''
+    text = """
+This is just a bunch of text without any 
+timing information inside
+i wonder what it would return
+    """
+    with pytest.raises(ValueError):
+        extract_min_max_time(text)
+    
