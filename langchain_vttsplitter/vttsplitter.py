@@ -119,6 +119,9 @@ def get_time(text):
     Gets the start time and end time from a time segment
     """
     segments = text.split(" --> ")
+    if len(segments) != 2:
+        raise ValueError
+    
     return (segments[0], segments[1].split(" align:")[0])
 
 
