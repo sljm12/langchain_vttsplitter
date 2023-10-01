@@ -181,6 +181,9 @@ class VTTSplitter:
         self.chunk = chunk
 
     def process_chunk_doc(self, chunk: str, timings, parent_metadata: Dict) -> Document:
+        '''
+        Given a chunk of text return the Document with the timings and the parent metadata inside it.
+        '''
         _, end = extract_min_max_time(timings[-1])
         start, _ = extract_min_max_time(timings[0])
         metadata = copy.deepcopy(parent_metadata)
@@ -251,19 +254,14 @@ class VTTSplitter:
                 current_length = len(t)
         chunks.append(temp)
         return chunks
-
+    
     def split_documents(self, documents: Iterable[Document]) -> List[Document]:
+        '''
+        Split a List of Documents into smaller chunks
+        returns a List of Chunked Documents
+        '''
         docs = []
         for d in documents:
-            chuncks = self.split_text(d.page_content)
-            for c in chuncks:
-                page_content, vtt_meta, timings, transcript = clear_lines(c)
-
-                start, end = extract_min_max_time(c)
-                current_md = copy.deepcopy(d.metadata)
-                current_md["start_time"] = int(convert_text_time_to_seconds(start))
-                current_md["end_time"] = int(convert_text_time_to_seconds(end))
-                docs.append(
-                    Document(page_content="\n".join(transcript), metadata=current_md)
-                )
+            chunk_docs = self.split_text_docs(d)
+            docs.append(chunk_docs)
         return docs
