@@ -5,6 +5,8 @@ vttsplitter contains methods for splitting VTT files
 import re
 from typing import List, Iterable, Dict
 import copy
+from urllib.parse import urlparse, parse_qs
+
 from langchain.docstore.document import Document
 from langchain.document_loaders.base import BaseLoader
 
@@ -158,6 +160,13 @@ class YoutubeSubtitleLoader(BaseLoader):
     def __init__(self, youtube_url: str, language="en"):
         self.url = youtube_url
         self.language = language
+        url_segments = urlparse(youtube_url)
+        query = parse_qs(url_segments.query)
+        if 'v' in query:
+            self.ytid = query['v'][0]
+        else:
+            self.ytid = None
+            raise ValueError("Youtube URL has no valid ID")
 
     def load(self) -> List[Document]:
         sub_url, title = download_subtitles(self.url, self.language)
@@ -167,6 +176,7 @@ class YoutubeSubtitleLoader(BaseLoader):
         metadata = {}
         metadata["url"] = self.url
         metadata["title"] = title
+        metadata["ytid"] = self.ytid
         metadata.update(vtt_meta)
 
         return [Document(page_content=page_content, metadata=metadata)]
