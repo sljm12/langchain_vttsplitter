@@ -20,3 +20,11 @@ def test_downsub_no_subtitles():
     subtitle, title = download_subtitles("https://www.youtube.com/watch?v=eS2iEPAxNWY", language='en')
 
     assert subtitle is None, title is not None
+
+def test_downsub_with_subtitles():
+    '''
+    Test with a youtube url that has no subtitles
+    '''
+    subtitle, title = download_subtitles("https://www.youtube.com/watch?v=LCcWWbx6pXU", language='en')
+
+    assert subtitle is not None, title is not None

@@ -271,7 +271,7 @@ class VTTSplitter:
         returns a List of Chunked Documents
         '''
         docs = []
-        for d in documents:
-            chunk_docs = self.split_text_docs(d)
+        for doc in documents:
+            chunk_docs = self.split_text_docs(doc)
             docs.append(chunk_docs)
         return docs
