@@ -148,7 +148,10 @@ def convert_text_time_to_seconds(text):
     Converts the VTT formatted time to seconds for use in the YT embed player
     """
     segments = [float(i) for i in text.split(":")]
-    return segments[0] * 60 * 60 + segments[1] * 60 + segments[2]
+    if len(segments) == 3:
+        return segments[0] * 60 * 60 + segments[1] * 60 + segments[2]
+    else:
+        return segments[0] * 60 + segments[1]
 
 
 class YoutubeSubtitleLoader(BaseLoader):

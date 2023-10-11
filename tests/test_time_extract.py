@@ -3,7 +3,7 @@ Testing time functions
 '''
 import pytest
 
-from langchain_vttsplitter.vttsplitter import get_time, extract_min_max_time
+from langchain_vttsplitter.vttsplitter import get_time, extract_min_max_time, convert_text_time_to_seconds
 
 def test_get_time_correct():
     '''
@@ -55,4 +55,15 @@ i wonder what it would return
     """
     with pytest.raises(ValueError):
         extract_min_max_time(text)
-    
+
+def test_convert_text_seconds_3_segments():
+    """
+    """
+    v = convert_text_time_to_seconds("00:02:49.729")
+    assert 169.729 == pytest.approx(v, 0.1) 
+
+def test_convert_text_seconds_2_segments():
+    """
+    """
+    v = convert_text_time_to_seconds("02:49.729")
+    assert 169.729 == pytest.approx(v, 0.1) 
